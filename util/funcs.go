@@ -17,6 +17,13 @@ import "math"
 //	return
 //}
 
+func F32toF64(in []float32)(out []float64){
+	for _,f:=range in{
+		out = append(out,float64(f))
+	}
+	return
+}
+
 func GroupFrequencies(n int, freqs []float64)(groups []float64){
 	if len(freqs) == 0 || n > len(freqs){
 		return

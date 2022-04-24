@@ -4,6 +4,7 @@ import (
 	eb "github.com/hajimehoshi/ebiten/v2"
 	"github.com/mjibson/go-dsp/fft"
 	m "github.com/softtacos/go-visualizer/model"
+	"github.com/softtacos/go-visualizer/util"
 	"image/color"
 	"sync"
 )
@@ -20,7 +21,7 @@ var (
 	emptyDrawTriangleOptions = &eb.DrawTrianglesOptions{}
 )
 
-func NewBasicVisualizer(input chan []float64) m.Visualizer {
+func NewBasicVisualizer(input chan []float32) m.Visualizer {
 	return &basicVisualizer{
 		input:        input,
 		currentMutex: &sync.Mutex{},
@@ -28,16 +29,18 @@ func NewBasicVisualizer(input chan []float64) m.Visualizer {
 }
 
 type basicVisualizer struct {
-	input        chan []float64
+	input        chan []float32
 	current      []float64
 	currentMutex *sync.Mutex
 }
+
+
 
 func (v *basicVisualizer) Draw(screen *eb.Image) {
 	// get cf
 	input := <-v.input
 	l := len(input)
-	cf := fft.FFTReal(input)
+	cf := fft.FFTReal(util.F32toF64(input))
 	frequencies := make([]float64, l)
 	for i := range cf {
 		frequencies[i] = float64(real(cf[i]))

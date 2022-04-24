@@ -1,13 +1,15 @@
 package stream
 
 import (
+	"fmt"
 	pa "github.com/gordonklaus/portaudio"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
-func NewStreamer(output chan []float64,cap int,stop chan os.Signal)*streamer{
+func NewStreamer(output chan []float32,cap int,stop chan os.Signal)*streamer{
 	return &streamer{
 		cap:cap,
 		output:output,
@@ -17,7 +19,8 @@ func NewStreamer(output chan []float64,cap int,stop chan os.Signal)*streamer{
 
 type streamer struct {
 	cap int
-	output chan []float64
+	stream *pa.Stream
+	output chan []float32
 	stop chan os.Signal
 }
 
@@ -25,7 +28,7 @@ func (s *streamer) Start() {
 	const numSamples = 128
 	go func() {
 		in := make([]int32, numSamples)
-		stream,err:=pa.OpenDefaultStream(1,0,44100,len(in),in)
+		stream,err:=pa.OpenDefaultStream(1,0,48000,len(in),in) // 44100
 		if err!=nil{
 			log.Panic("failed to open stream:",err)
 		}
@@ -44,9 +47,9 @@ func (s *streamer) Start() {
 				return
 			default:
 			}
-			var out =make([]float64,numSamples)
+			var out =make([]float32,numSamples)
 			for i:=range in{
-				out[i] = float64(in[i])
+				out[i] = float32(in[i])
 			}
 
 			if len(s.output) ==s.cap {
@@ -55,6 +58,52 @@ func (s *streamer) Start() {
 			s.output <- out
 		}
 	}()
+}
+
+func (s *streamer)Setup() {
+	defaultIn,err :=pa.DefaultInputDevice()
+	if err!=nil{
+		panic(err)
+	}
+	var device *pa.DeviceInfo
+	devices,err:=pa.Devices()
+	if err!=nil{
+		panic(err)
+	}
+	fmt.Println(defaultIn)
+	for _,d:=range devices{
+		//USB Audio Device
+		fmt.Println(d.DefaultSampleRate)
+		if strings.Contains(d.Name,"USB") && d.MaxInputChannels > 0 {
+			device = d
+		}
+	}
+	if device == nil{
+		log.Panic("no USB device found!")
+	}
+	stream,err:=pa.OpenStream(pa.StreamParameters{
+		Input: pa.StreamDeviceParameters{
+			Device:device,
+			Channels: 1,
+		},
+		SampleRate: device.DefaultSampleRate,
+		FramesPerBuffer: 128,
+	},s.readCallback)
+	if err!=nil{
+		log.Panic("failed to open stream:",err)
+	}
+	s.stream = stream
+}
+
+func (s *streamer)Start2(){
+	if err:=s.stream.Start();err!=nil{
+		log.Panic("failed to start stream",err)
+	}
+}
+
+func (s *streamer) readCallback(in []float32){
+	fmt.Println(in)
+	s.output<-in
 }
 
 func (s *streamer) Stop() {
