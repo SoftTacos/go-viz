@@ -81,6 +81,8 @@ type circleVisualizer struct {
 	poly        *Polygon
 	colorFloats [][]float64
 	colors      []color.Color
+
+	r float64
 }
 
 func (v *circleVisualizer) Draw(screen *eb.Image) {
@@ -105,50 +107,9 @@ func (v *circleVisualizer) Draw(screen *eb.Image) {
 	//ops = CenterOps(v.poly.GetImg(), ops)
 	//screen.DrawImage(v.poly.GetImg(), &ops)
 	ops.Filter = eb.FilterLinear
-	DrawImgFromCenter(screen, v.poly.GetImg(), 1, ops)
-	SpiralNestPolygons(screen, v.poly, 8, 1, 0, ops)
-	/*
-		for i, g :=range groups{
-			//centerX,centerY := width/float64(len(groups))*float64(i),height/2
-			centerX,centerY := width/2,height/2
+	//v.r+=.025
 
-			ops := eb.DrawImageOptions{}
-			colors := v.colorFloats[i%len(v.colorFloats)]
-			_=colors
-			ops.ColorM.Scale(0,0,0,1)
-			//ops.ColorM.Translate(float64(0xff)/0xff,float64(0x0)/0xff,float64(0xff)/0xff,0)
-			ops.ColorM.Translate(colors[0]/0xff,colors[1]/0xff,colors[2]/0xff,0)
-			//ops.ColorM.Apply(v.colors[i%len(v.colors)])
-			//scale :=(normalizeFrequency(g,height)/2)*scaleCoefficient
-			var	scale float64 = .5
-			_=g
-			//ops.GeoM.Scale(scale,scale)
-			//cirleW, circleH :=v.poly.Size()
-			//ops.GeoM.Translate(centerX-scale*float64(cirleW)/2,centerY-scale*float64(circleH)/2)
-
-			//ops=CenterOps(v.poly,centerX,centerY,scale,ops)
-			//screen.DrawImage(v.poly,&ops)
-			//ops.ColorM.Scale(0,0,0,1)
-			//ops=CenterOps(v.poly,centerX,centerY,scale*.9,ops)
-			//screen.DrawImage(v.poly,&ops)
-
-			DrawImgFromCenter(screen,v.poly,centerX,centerY,scale,ops)
-			ops.ColorM.Scale(0,0,0,1)
-			DrawImgFromCenter(screen,v.poly,centerX,centerY,scale*.9,ops)
-
-			ops.ColorM.Translate(colors[0]/0xff,colors[1]/0xff,colors[2]/0xff,0)
-			//ops.GeoM.Translate(?)
-			ops.GeoM.Rotate(math.Pi*2/(6*2))
-			DrawImgFromCenter(screen,v.poly,centerX,centerY,scale*.9,ops)
-			//ops.GeoM.Scale(.9,.9)
-			//ops.ColorM.Scale(0,0,0,1)
-			//screen.DrawImage(v.poly,&ops)
-
-		}
-	*/
-}
-
-func DrawHollowImg(screen, img *eb.Image) {
+	SpiralNestPolygons(screen, v.poly, 8, 1, v.r, ops)
 
 }
 
@@ -156,19 +117,6 @@ func DrawImgFromCenter(screen, img *eb.Image, scale float64, ops eb.DrawImageOpt
 	cirleW, circleH := img.Size()
 	ops.GeoM.Scale(scale, scale)
 	ops.GeoM.Translate(-scale*float64(cirleW)/2, -scale*float64(circleH)/2)
-	screen.DrawImage(img, &ops)
-}
-
-// problem is:
-// move half back
-// rotate
-// move half back again
-
-// x and y are the coordinates WITHIN SCREEN that you want to draw
-func DrawImgFromCenter_old(screen, img *eb.Image, x, y, scale float64, ops eb.DrawImageOptions) {
-	cirleW, circleH := img.Size()
-	ops.GeoM.Scale(scale, scale)
-	ops.GeoM.Translate(x-scale*float64(cirleW)/2, y-scale*float64(circleH)/2)
 	screen.DrawImage(img, &ops)
 }
 
@@ -189,9 +137,6 @@ func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, rotat
 		return
 	}
 
-	r, s := CalcPolyRotationScale(poly)
-	rotation += r
-	scale *= s
 	cirleW, circleH := poly.GetImg().Size()
 	local := eb.DrawImageOptions{
 		ColorM: ops.ColorM,
@@ -202,6 +147,10 @@ func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, rotat
 
 	local.GeoM.Concat(ops.GeoM)
 	screen.DrawImage(poly.GetImg(), &local)
+	// could just break this out and store it somewhere later
+	r, s := CalcPolyRotationScale(poly)
+	rotation += r
+	scale *= s
 	SpiralNestPolygons(screen, poly, depth-1, scale, rotation, ops)
 }
 
