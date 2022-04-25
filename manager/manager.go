@@ -8,9 +8,9 @@ import (
 )
 
 
-type VisualizerConstructor func(chan []float32)m.Visualizer
+type VisualizerConstructor func(chan []float64)m.Visualizer
 
-func NewVisManager(audio chan []float32,constructors []VisualizerConstructor)*manager {
+func NewVisManager(audio chan []float64,constructors []VisualizerConstructor)*manager {
 	return &manager{
 		constructors:constructors,
 		currentVisualizer: constructors[0](audio),

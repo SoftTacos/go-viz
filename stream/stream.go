@@ -5,11 +5,10 @@ import (
 	pa "github.com/gordonklaus/portaudio"
 	"log"
 	"os"
-	"strings"
 	"time"
 )
 
-func NewStreamer(output chan []float32,cap int,stop chan os.Signal)*streamer{
+func NewStreamer(output chan []float64,cap int,stop chan os.Signal)*streamer{
 	return &streamer{
 		cap:cap,
 		output:output,
@@ -20,7 +19,7 @@ func NewStreamer(output chan []float32,cap int,stop chan os.Signal)*streamer{
 type streamer struct {
 	cap int
 	stream *pa.Stream
-	output chan []float32
+	output chan []float64
 	stop chan os.Signal
 }
 
@@ -44,6 +43,7 @@ func (s *streamer) Start() {
 			}
 			select {
 			case <-s.stop:
+				log.Println("shutting down listener")
 				return
 			default:
 			}
@@ -52,32 +52,37 @@ func (s *streamer) Start() {
 				out[i] = float32(in[i])
 			}
 
-			if len(s.output) ==s.cap {
+			if len(s.output) == s.cap {
 				<-s.output
 			}
-			s.output <- out
+			o := make([]float64,len(in))
+			for i:=range in{
+				o[i] =float64(in[i])
+			}
+			s.output<-o
+
 		}
 	}()
 }
 
 func (s *streamer)Setup() {
-	defaultIn,err :=pa.DefaultInputDevice()
-	if err!=nil{
-		panic(err)
-	}
 	var device *pa.DeviceInfo
 	devices,err:=pa.Devices()
 	if err!=nil{
 		panic(err)
 	}
-	fmt.Println(defaultIn)
 	for _,d:=range devices{
 		//USB Audio Device
-		fmt.Println(d.DefaultSampleRate)
-		if strings.Contains(d.Name,"USB") && d.MaxInputChannels > 0 {
+		//if strings.Contains(d.Name,"USB") && d.MaxInputChannels > 0 {
+		//	device = d
+		//  break
+		//}
+		if d.MaxInputChannels > 0 {
 			device = d
+			break
 		}
 	}
+	fmt.Println("device:",device)
 	if device == nil{
 		log.Panic("no USB device found!")
 	}
@@ -102,8 +107,12 @@ func (s *streamer)Start2(){
 }
 
 func (s *streamer) readCallback(in []float32){
-	fmt.Println(in)
-	s.output<-in
+	//fmt.Println(in)
+	o := make([]float64,len(in))
+	for i:=range in{
+		o[i] =float64(in[i])
+	}
+	s.output<-o
 }
 
 func (s *streamer) Stop() {

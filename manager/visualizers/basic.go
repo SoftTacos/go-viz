@@ -80,9 +80,9 @@ func DrawFrequencies(screen *eb.Image, frequencies []float64) {
 		x := (xchunk * float32(i+1))
 		//x2:=xchunk*(i+1)
 
-		fOffset := -float32(f) / 20000000 //float32(v.height)
-		y1 := midheight + fOffset - thiccness
-		y2 := midheight + fOffset + thiccness
+		fOffset := -float32(f) * 100//20000000 //float32(v.height)
+		y1 := midheight + fOffset - 2*thiccness
+		y2 := midheight + fOffset //+ thiccness
 
 		vertices = append(vertices,
 			eb.Vertex{

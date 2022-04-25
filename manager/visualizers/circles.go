@@ -1,7 +1,6 @@
 package visualizers
 
 import (
-	"fmt"
 	eb "github.com/hajimehoshi/ebiten/v2"
 	"github.com/mjibson/go-dsp/fft"
 	m "github.com/softtacos/go-visualizer/model"
@@ -17,7 +16,7 @@ func NewCircleVisualizer(bufferSize int, ampInput chan []float64) m.Visualizer {
 		buffer:   util.NewFrequencyBuffer(bufferSize),
 		ampInput: ampInput,
 		//poly:     CreatePolyImgHollow(1000,6),
-		poly: NewPolygon(6, 100),
+		poly: NewPolygon(6, 500),
 		colorFloats: [][]float64{
 			{low, hi, low, 1},
 			{low, 0x90, hi, 1},
@@ -104,8 +103,10 @@ func (v *circleVisualizer) Draw(screen *eb.Image) {
 	ops.ColorM.Translate(v.colorFloats[0][0]/0xff, v.colorFloats[0][1]/0xff, v.colorFloats[0][2]/0xff, 0)
 	ops.GeoM.Translate(width/2, height/2)
 	//ops = CenterOps(v.poly.GetImg(), ops)
-	SpiralNestPolygons(screen, v.poly, 3, .9,1, ops)
-	//DrawImgFromCenter(screen,v.poly.GetImg(),width/2,height/2,1,ops)
+	//screen.DrawImage(v.poly.GetImg(), &ops)
+	ops.Filter = eb.FilterLinear
+	DrawImgFromCenter(screen, v.poly.GetImg(), 1, ops)
+	SpiralNestPolygons(screen, v.poly, 8, 1, 0, ops)
 	/*
 		for i, g :=range groups{
 			//centerX,centerY := width/float64(len(groups))*float64(i),height/2
@@ -183,66 +184,36 @@ func CenterOps(img *eb.Image, ops eb.DrawImageOptions) eb.DrawImageOptions {
 	return local
 }
 
-func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale,rotation float64, ops eb.DrawImageOptions) {
+func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, rotation float64, ops eb.DrawImageOptions) {
 	if depth < 1 {
 		return
 	}
 
-	r,s:=CalcPolyRotationScale(poly)
-	rotation+=r
-	scale*=s
-
+	r, s := CalcPolyRotationScale(poly)
+	rotation += r
+	scale *= s
 	cirleW, circleH := poly.GetImg().Size()
 	local := eb.DrawImageOptions{
 		ColorM: ops.ColorM,
 	}
-	rot := eb.GeoM{}
-	rot.Translate(-float64(cirleW)/2, -float64(circleH)/2)
-	//rot.Translate(float64(cirleW)/2, float64(circleH)/2)
-	rotation+=math.Pi / 4
-	rot.Rotate(rotation)
-	// translate in
-	//local.GeoM.Translate(-float64(cirleW)/2, -float64(circleH)/2)
-	// scale
-	scale*=scale
-	rot.Scale(scale, scale)
+	local.GeoM.Translate(-float64(cirleW)/2, -float64(circleH)/2)
+	local.GeoM.Rotate(rotation)
+	local.GeoM.Scale(scale,scale)
 
-	// translate out
-
-	local.GeoM.Concat(rot)
 	local.GeoM.Concat(ops.GeoM)
 	screen.DrawImage(poly.GetImg(), &local)
-	//local.GeoM.Rotate(-math.Pi/4)
-	//local.GeoM.Translate(float64(cirleW)/2, float64(circleH)/2)
-
-	//ops.GeoM.Concat(local.GeoM)
-
-	//// before the func, coordinates need to be localized
-	//local := eb.DrawImageOptions{
-	//	ColorM: ops.ColorM,
-	//}
-	//local.GeoM.Scale(scale,scale)
-	//local.GeoM.Rotate(math.Pi/4)
-	//local.GeoM.Concat(ops.GeoM)
-	////local.GeoM.Translate(float64(cirleW)/2, float64(circleH)/2)
-
-	SpiralNestPolygons(screen, poly, depth-1, scale,rotation, ops)
-	//DrawImgFromCenter(screen, poly.GetImg(), 1, ops)
-	//ops = RotatePolyOps(poly, ops)
-	//SpiralNestPolygons(screen, poly, depth-1, ops)
+	SpiralNestPolygons(screen, poly, depth-1, scale, rotation, ops)
 }
 
-func CalcPolyRotationScale(poly *Polygon)(rotation,scale float64){
-	scale = math.Sqrt(math.Pow((.5+.5*math.Cos(poly.GetTheta())), 2) + math.Pow(.5*math.Sin(poly.GetTheta()), 2))
-	rotation = (math.Pi - poly.GetTheta()) / 2 //math.Pi * poly.GetTheta() / 2
-	fmt.Println(scale,rotation)
+func CalcPolyRotationScale(poly *Polygon) (rotation, scale float64) {
+	scale = math.Sqrt(math.Pow((.5+.5*math.Cos(math.Pi-poly.GetTheta())), 2) + math.Pow(.5*math.Sin(math.Pi-poly.GetTheta()), 2))
+	rotation = (math.Pi - poly.GetTheta()) / 2.0 //math.Pi * poly.GetTheta() / 2
+	//fmt.Println(2.0/3.0*math.Pi,poly.GetTheta(),scale,rotation)
 	return
 }
 
 func RotatePolyOps(poly *Polygon, ops eb.DrawImageOptions) eb.DrawImageOptions {
-	newL := 1/math.Sqrt(math.Pow((.5+.5*math.Cos(poly.GetTheta())), 2) + math.Pow(.5*math.Sin(poly.GetTheta()), 2))
-	fmt.Println(newL)
-	rotateBy := (math.Pi - poly.GetTheta()) / 2 //math.Pi * poly.GetTheta() / 2
+	newL,rotateBy:=CalcPolyRotationScale(poly)
 	imgX, imgY := poly.img.Size()
 
 	deltaX := newL*math.Sin(rotateBy) - float64(imgX)/2
@@ -261,12 +232,12 @@ func RotatePolyOps(poly *Polygon, ops eb.DrawImageOptions) eb.DrawImageOptions {
 
 func NewPolygon(n int, radius float64) *Polygon {
 	if n < 3 {
-		return nil // ?
+		n = 3
 	}
 	p := &Polygon{
 		n:      float64(n),
 		radius: radius,
-		img:    CreatePolyImgHollow(radius, n, .7),
+		img:    CreatePolyImgHollow(radius, n, .9),
 	}
 	p.calculateTheta()
 	p.calculateL()
