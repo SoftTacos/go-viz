@@ -3,52 +3,37 @@ package main
 import (
 	pa "github.com/gordonklaus/portaudio"
 	"github.com/hajimehoshi/ebiten/v2"
-	m "github.com/softtacos/go-visualizer/manager"
+	man "github.com/softtacos/go-visualizer/manager"
 	v "github.com/softtacos/go-visualizer/manager/visualizers"
-	s "github.com/softtacos/go-visualizer/stream"
+	m "github.com/softtacos/go-visualizer/model"
 	"log"
-	"os"
-	"os/signal"
 )
 
 const (
-	wWidth,wHeight = 1280,960
-	windowSize = 256 // number of samples per []float64
+	wWidth, wHeight = 1280, 960
 )
 
 func main() {
 	var err error
-	if err=pa.Initialize();err!=nil{
-		log.Fatal("failed to initialize portaudio ",err)
+	if err = pa.Initialize(); err != nil {
+		log.Fatal("failed to initialize portaudio ", err)
 		return
 	}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, os.Kill)
-	var buffer = 2
-	streamOutput :=make(chan []float64,buffer)
-
-	streamer:=s.NewStreamer(windowSize,streamOutput,buffer,sig)
-	streamer.Setup()
-	streamer.Start2()
-
-	ebiten.SetWindowSize(wWidth,wHeight)
-	ebiten.SetWindowResizable(true)
-	ebiten.SetFPSMode(ebiten.FPSModeVsyncOn)
-	ebiten.SetWindowTitle("go visualizer")
-	//ebiten.SetFullscreen(true)
-	//ebiten.SetWindowSize(1791,1120)
-	if err = ebiten.RunGame(m.NewVisManager(streamOutput,[]m.VisualizerConstructor{
-		v.NewLazyPolyVisualizer,
+	// vis manager currently just handles passing the draw calls to the visualizer
+	// will eventually decide which visualizer should be set for the current vis
+	// uses closures to store setup data for the visualizers so they can be created and destroyed easily at runtime
+	karen := man.NewVisManager([]m.VisualizerConstructor{
+		v.NewPolyVisualizerConstructor,
 		//v.NewLazyPaddedVisualizer,
-		v.NewBasicVisualizer,
-	}));err!=nil{
-		log.Fatal("error running game ",err)
+	})
+	karen.Start()
+	ebiten.SetWindowSize(wWidth, wHeight)
+	ebiten.SetWindowResizable(true)
+	//ebiten.SetFPSMode(ebiten.FPSModeVsyncOn)
+	ebiten.SetWindowTitle("go visualizer")
+	if err = ebiten.RunGame(karen); err != nil {
+		log.Fatal("error running game ", err)
 	}
-	streamer.Stop()
-	if err= pa.Terminate();err!=nil{
-		log.Println("failed to terminate:",err)
-	}
-	log.Println("shutting down")
+	karen.Stop()
 }
-

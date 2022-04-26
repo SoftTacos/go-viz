@@ -2,7 +2,6 @@ package visualizers
 
 import (
 	eb "github.com/hajimehoshi/ebiten/v2"
-	"github.com/mjibson/go-dsp/fft"
 	m "github.com/softtacos/go-visualizer/model"
 	"github.com/softtacos/go-visualizer/util"
 	"image/color"
@@ -11,76 +10,117 @@ import (
 	//"github.com/goccmack/godsp/peaks"
 )
 
-func NewPolyVisualizer(bufferSize, samples int, ampInput chan []float64) m.Visualizer {
+// TODO: bump to golang v1.18 and make a generic visualizer setup func
+type PolyOption func(v *polyVisualizer)
+
+const (
+	defaultBufferSize = 3
+	defaultPolyRadius = 500
+	defaultPolySides  = 6
+)
+
+func SetBufferFunc(bufferSize, windowSize int) PolyOption {
+	return func(v *polyVisualizer) {
+		v.buffer = util.NewFrequencyBuffer(bufferSize, windowSize)
+	}
+}
+
+func SetPolyFunc(sides int, radius float64) PolyOption {
+	return func(v *polyVisualizer) {
+		v.poly = NewPolygon(sides, radius)
+	}
+}
+
+func NewPolyVisualizerOptionsConstructor(windowSize int, frequencyInput chan []float64, options ...PolyOption) func() m.Visualizer {
+	return func() m.Visualizer {
+		v := newPolyVisualizer(windowSize, frequencyInput)
+		for _, o := range options {
+			o(v)
+		}
+		return v
+	}
+}
+
+func NewPolyVisualizerConstructor(windowSize int, frequencyInput chan []float64) m.Visualizer {
+	return newPolyVisualizer(windowSize, frequencyInput)
+}
+
+func newPolyVisualizer(windowSize int, frequencyInput chan []float64) *polyVisualizer {
 	var hi, med, low float64 = 0xff, 0x90, 0x50
 	v := &polyVisualizer{
-		buffer:   util.NewFrequencyBuffer(bufferSize, samples),
-		ampInput: ampInput,
-		//poly:     CreatePolyImgHollow(1000,6),
-		poly: NewPolygon(6, 500),
+		buffer:         util.NewFrequencyBuffer(defaultBufferSize, windowSize),
+		frequencyInput: frequencyInput,
+		poly:           NewPolygon(defaultPolySides, defaultPolyRadius),
 		colorFloats: [][]float64{
-			{low, hi, low, 1},  // green
+			{low, hi, low, 1}, // green
 			{low, med, hi, 1}, // blue
 			{hi, low, low, 1}, // red
-			{med, low, hi, 1},  // purple
+			{med, low, hi, 1}, // purple
 		},
 		indexMutex: &sync.Mutex{},
 	}
-	v.testBeatDetector = util.NewBeatDetector(48000, 200, v.beatCallback)
-	go v.listen()
+	//v.testBeatDetector = util.NewBeatDetector(48000, 200, v.beatCallback)
+	//go v.listen()
 	return v
 }
 
-func NewLazyPolyVisualizer(ampInput chan []float64) m.Visualizer {
-	return NewPolyVisualizer(4, 256, ampInput)
-}
+//func NewPolyVisualizer(bufferSize, samples int, ampInput chan []float64) m.Visualizer {
+//	var hi, med, low float64 = 0xff, 0x90, 0x50
+//	v := &polyVisualizer{
+//		buffer:   util.NewFrequencyBuffer(bufferSize, samples),
+//		ampInput: ampInput,
+//		poly: NewPolygon(6, 500),
+//		colorFloats: [][]float64{
+//			{low, hi, low, 1},  // green
+//			{low, med, hi, 1}, // blue
+//			{hi, low, low, 1}, // red
+//			{med, low, hi, 1},  // purple
+//		},
+//		indexMutex: &sync.Mutex{},
+//	}
+//	v.testBeatDetector = util.NewBeatDetector(48000, 200, v.beatCallback)
+//	//go v.listen()
+//	return v
+//}
 
 type polyVisualizer struct {
-	ampInput chan []float64
-	buffer   *util.Buffer
-	//poly        *eb.Image
-	poly        *Polygon
-	colorFloats [][]float64
-	colors      []color.Color
-
+	frequencyInput chan []float64
+	buffer         *util.Buffer
+	poly           *Polygon
+	colorFloats    [][]float64
+	colors         []color.Color
 	r                float64
 	indexMutex       *sync.Mutex
 	colorIndex       int
-	testBeatDetector *util.BeatDetector
 }
 
-func (v *polyVisualizer) listen() {
-	for {
-		amplitudes := <-v.ampInput
+//
+//func (v *polyVisualizer) listen() {
+//	for {
+//		amplitudes := <-v.ampInput
+//
+//		cf := fft.FFTReal(amplitudes)
+//		cf = cf[0 : len(cf)/2]
+//		frequencies := make([]float64, len(cf))
+//		for i := range cf {
+//			frequencies[i] = math.Abs(real(cf[i]))
+//		}
+//		v.buffer.Push(frequencies)
+//		v.testBeatDetector.Push(frequencies...)
+//
+//	}
+//}
 
-		cf := fft.FFTReal(amplitudes)
-		cf = cf[0 : len(cf)/2]
-		frequencies := make([]float64, len(cf))
-		for i := range cf {
-			frequencies[i] = math.Abs(real(cf[i]))
-		}
-		v.buffer.Push(frequencies)
-		v.testBeatDetector.Push(frequencies...)
-
-	}
-}
-
-func (v *polyVisualizer) beatCallback() {
+func (v *polyVisualizer) BeatCallback() {
 	v.indexMutex.Lock()
 	defer v.indexMutex.Unlock()
 	v.colorIndex = (v.colorIndex + 1) % len(v.colorFloats)
 }
 
-func lazyClamp(val float64, max float64) float64 {
-	if val > max {
-		return max
-	}
-	return val
-}
-
 func (v *polyVisualizer) Draw(screen *eb.Image) {
 	var (
-		frequencies   = v.buffer.GetAverage()
+		//frequencies   = v.buffer.GetAverage()
+		frequencies   = <-v.frequencyInput
 		w, h          = screen.Size()
 		width, height = float64(w), float64(h)
 		groups        = util.GroupFrequencies(5, frequencies)
@@ -99,42 +139,20 @@ func (v *polyVisualizer) Draw(screen *eb.Image) {
 	if change < 0 {
 		change = 0
 	}
-	ops.ColorM.Scale(0, 0, 0, .9)//.1+change)
+	ops.ColorM.Scale(0, 0, 0, .9) //.1+change)
 	v.indexMutex.Lock()
 	ops.ColorM.Translate(v.colorFloats[v.colorIndex][0]/0xff, v.colorFloats[v.colorIndex][1]/0xff, v.colorFloats[v.colorIndex][2]/0xff, 0)
 	v.indexMutex.Unlock()
 	ops.GeoM.Translate(width/2, height/2)
-	//ops = CenterOps(v.poly.GetImg(), ops)
-	//screen.DrawImage(v.poly.GetImg(), &ops)
 	ops.Filter = eb.FilterLinear
 	v.r += .015
-
 	scale := 2.0
-	//scale+= change*10000.0
-	SpiralNestPolygons(screen, v.poly, 22, scale, v.r, ops)
-	SpiralNestPolygons(screen, v.poly, 22, scale, v.r+math.Pi, ops)
+	rotStep, scaleStep := CalcPolyRotationScale(v.poly)
+	SpiralNestPolygons(screen, v.poly, 22, scale, scaleStep, v.r, rotStep, ops)
+	SpiralNestPolygons(screen, v.poly, 22, scale, scaleStep, v.r+math.Pi, rotStep, ops)
 }
 
-func DrawImgFromCenter(screen, img *eb.Image, scale float64, ops eb.DrawImageOptions) {
-	cirleW, circleH := img.Size()
-	ops.GeoM.Scale(scale, scale)
-	ops.GeoM.Translate(-scale*float64(cirleW)/2, -scale*float64(circleH)/2)
-	screen.DrawImage(img, &ops)
-}
-
-func CenterOps(img *eb.Image, ops eb.DrawImageOptions) eb.DrawImageOptions {
-	cirleW, circleH := img.Size()
-	local := eb.DrawImageOptions{
-		ColorM: ops.ColorM,
-	}
-	local.GeoM.Translate(-float64(cirleW)/2, -float64(circleH)/2)
-	//local.GeoM.Rotate(math.Pi/2)
-	//local.GeoM.Scale(.9, .9)
-	local.GeoM.Concat(ops.GeoM)
-	return local
-}
-
-func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, rotation float64, ops eb.DrawImageOptions) {
+func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, scaleStep, rotation, rotationStep float64, ops eb.DrawImageOptions) {
 	if depth < 1 {
 		return
 	}
@@ -149,36 +167,15 @@ func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, rotat
 
 	local.GeoM.Concat(ops.GeoM)
 	screen.DrawImage(poly.GetImg(), &local)
-	// could just break this out and store it somewhere later
-	r, s := CalcPolyRotationScale(poly)
-	rotation += r
-	scale *= s
-	SpiralNestPolygons(screen, poly, depth-1, scale, rotation, ops)
+	rotation += rotationStep
+	scale *= scaleStep
+	SpiralNestPolygons(screen, poly, depth-1, scale, scaleStep, rotation, rotationStep, ops)
 }
 
 func CalcPolyRotationScale(poly *Polygon) (rotation, scale float64) {
 	scale = math.Sqrt(math.Pow((.5+.5*math.Cos(math.Pi-poly.GetTheta())), 2) + math.Pow(.5*math.Sin(math.Pi-poly.GetTheta()), 2))
-	rotation = (math.Pi - poly.GetTheta()) / 2.0 //math.Pi * poly.GetTheta() / 2
-	//fmt.Println(2.0/3.0*math.Pi,poly.GetTheta(),scale,rotation)
+	rotation = (math.Pi - poly.GetTheta()) / 2.0
 	return
-}
-
-func RotatePolyOps(poly *Polygon, ops eb.DrawImageOptions) eb.DrawImageOptions {
-	newL, rotateBy := CalcPolyRotationScale(poly)
-	imgX, imgY := poly.img.Size()
-
-	deltaX := newL*math.Sin(rotateBy) - float64(imgX)/2
-	deltaY := newL*math.Cos(rotateBy) - float64(imgY)/2
-	//ops.GeoM.Rotate(rotateBy)
-	ops.GeoM.Translate(deltaX, deltaY)
-
-	local := eb.DrawImageOptions{}
-	local.GeoM.Rotate(rotateBy)
-	//ops.GeoM.Concat(local.GeoM)
-	local.GeoM.Concat(ops.GeoM)
-
-	//ops.GeoM.Scale(.9,.9)
-	return ops
 }
 
 func NewPolygon(n int, radius float64) *Polygon {

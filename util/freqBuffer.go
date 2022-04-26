@@ -5,14 +5,14 @@ import (
 	"time"
 )
 
-func NewFrequencyBuffer(len, samples int) *Buffer {
+func NewFrequencyBuffer(len, windowSize int) *Buffer {
 	frequencies:= make([][]float64, len)
 	for i:=range frequencies{
-		frequencies[i] = make([]float64, samples)
+		frequencies[i] = make([]float64, windowSize)
 	}
 	return &Buffer{
 		len:         len,
-		samples:     samples,
+		windowSize:  windowSize,
 		mutex:       &sync.Mutex{},
 		frequencies: frequencies,
 		//frequencies: make([][]float64, len),
@@ -22,12 +22,12 @@ func NewFrequencyBuffer(len, samples int) *Buffer {
 }
 
 type Buffer struct {
-	front        int
-	len, samples int
-	frequencies  [][]float64 // [i] is the timeslice, [j] is the frequency band
-	lastSample   time.Time
-	derivative   []float64
-	mutex        *sync.Mutex
+	front           int
+	len, windowSize int
+	frequencies     [][]float64 // [i] is the timeslice, [j] is the frequency band
+	lastSample      time.Time
+	derivative      []float64
+	mutex           *sync.Mutex
 }
 
 func (q *Buffer) Push(args ...[]float64) {

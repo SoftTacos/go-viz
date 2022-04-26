@@ -48,6 +48,11 @@ func (v *basicVisualizer) Draw(screen *eb.Image) {
 	DrawFrequencies(screen, frequencies)
 }
 
+func (v *basicVisualizer)BeatCallback(){
+	fmt.Println("TODO: padded viz beat callback")
+}
+
+
 func DrawFrequencies(screen *eb.Image, frequencies []float64) {
 	width, height := screen.Size()
 	//frequencies := <-v.input

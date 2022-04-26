@@ -1,43 +1,43 @@
 package visualizers
 
 import (
+	"fmt"
 	eb "github.com/hajimehoshi/ebiten/v2"
 	"github.com/mjibson/go-dsp/fft"
 	m "github.com/softtacos/go-visualizer/model"
 	"github.com/softtacos/go-visualizer/util"
 	"math"
 	"sync"
-
 	//"github.com/goccmack/godsp/peaks"
 )
 
-func NewPaddedVisualizer(bufferSize,samples int,ampInput chan []float64)m.Visualizer{
-	v:=&paddedVisualizer{
-		buffer: util.NewFrequencyBuffer(bufferSize,samples),
-		ampInput:ampInput,
+func NewPaddedVisualizer(bufferSize, samples int, ampInput chan []float64) m.Visualizer {
+	v := &paddedVisualizer{
+		buffer:   util.NewFrequencyBuffer(bufferSize, samples),
+		ampInput: ampInput,
 		ampMutex: &sync.Mutex{},
 	}
 	go v.listen()
 	return v
 }
 
-func NewLazyPaddedVisualizer(ampInput chan []float64)m.Visualizer{
-	return NewPaddedVisualizer(2,128,ampInput)
+func NewLazyPaddedVisualizer(ampInput chan []float64) m.Visualizer {
+	return NewPaddedVisualizer(2, 128, ampInput)
 }
 
-func (v *paddedVisualizer)listen(){
+func (v *paddedVisualizer) listen() {
 	for {
 		// TODO: extract out into a pipeline once we can test this out on a pi
-		amplitudes:=<-v.ampInput
+		amplitudes := <-v.ampInput
 
 		v.ampMutex.Lock()
 		v.currentAmp = amplitudes
 		v.ampMutex.Unlock()
 
-		cf:=fft.FFTReal(amplitudes)
-		cf = cf[0:len(cf)/2]
-		frequencies := make([]float64,len(cf))
-		for i:=range cf {
+		cf := fft.FFTReal(amplitudes)
+		cf = cf[0 : len(cf)/2]
+		frequencies := make([]float64, len(cf))
+		for i := range cf {
 			frequencies[i] = math.Abs(real(cf[i]))
 		}
 		v.buffer.Push(frequencies)
@@ -46,17 +46,21 @@ func (v *paddedVisualizer)listen(){
 }
 
 type paddedVisualizer struct {
-	ampInput chan []float64
+	ampInput   chan []float64
 	currentAmp []float64
-	ampMutex *sync.Mutex
-	buffer *util.Buffer
+	ampMutex   *sync.Mutex
+	buffer     *util.Buffer
 }
 
-func (v *paddedVisualizer)Draw(screen *eb.Image){
+func (v *paddedVisualizer) Draw(screen *eb.Image) {
 	//v.ampMutex.Lock()
 	//DrawFrequencies(screen,v.currentAmp)
 	//v.ampMutex.Unlock()
-	DrawFrequencies(screen,v.buffer.GetAverage())
+	DrawFrequencies(screen, v.buffer.GetAverage())
+}
+
+func (v *paddedVisualizer) BeatCallback() {
+	fmt.Println("TODO: padded viz beat callback")
 }
 
 //func GetPeaks(x []float64, sep int) []int {
@@ -135,4 +139,3 @@ func (v *paddedVisualizer)Draw(screen *eb.Image){
 //	avg/=float64(len(low))
 //	return
 //}
-

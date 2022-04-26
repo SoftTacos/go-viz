@@ -1,26 +1,78 @@
 package manager
 
 import (
+	pa "github.com/gordonklaus/portaudio"
 	eb "github.com/hajimehoshi/ebiten/v2"
+	a "github.com/softtacos/go-visualizer/analyzer"
 	m "github.com/softtacos/go-visualizer/model"
+	s "github.com/softtacos/go-visualizer/stream"
+	"github.com/softtacos/go-visualizer/util"
+	"log"
 	"math"
 	"math/cmplx"
+	"os"
+	"os/signal"
 )
 
-type VisualizerConstructor func(chan []float64) m.Visualizer
+const (
+	windowSize    = 256 // number of samples per []float64
+	defaultBuffer = 2
+)
 
-func NewVisManager(audio chan []float64, constructors []VisualizerConstructor) *manager {
-	return &manager{
+// TODO: this is hideous, clean it up
+func NewVisManager(constructors []m.VisualizerConstructor) *manager {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, os.Kill)
+	streamOutput := make(chan []float64, defaultBuffer)
+	frequencyOutput := make(chan []float64, defaultBuffer)
+
+	streamer := s.NewStreamer(windowSize, streamOutput, defaultBuffer)
+	viz := constructors[0](windowSize,frequencyOutput)
+	var beatDetector *util.BeatDetector
+	beatDetector = util.NewBeatDetector(48000, 190, nil)
+	var analyzer *a.Analyzer = a.NewAnalyzer(streamOutput,
+		a.GenerateFftAnalyzerAnalyzer(frequencyOutput),
+		a.GenerateBeatDetectorAnalyzer(beatDetector))
+
+	m := &manager{
+		analyzer:          analyzer,
 		constructors:      constructors,
-		currentVisualizer: constructors[0](audio),
+		currentVisualizer: viz,
+		streamer:          streamer,
 	}
+
+	beatDetector.SetCallback(m.BeatCallback)
+	// streamer reads audio output from mic
+	// analyzer analyzes the data and outputs the results to any number of ways
+
+	return m
+}
+
+func (v *manager) Start() {
+	v.streamer.Start()
+	v.analyzer.Start()
+}
+
+func (v *manager) Stop() {
+	var err error
+	log.Println("attempting to terminate")
+	if err = pa.Terminate(); err != nil {
+		log.Println("failed to terminate:", err)
+	}
+	log.Println("shutting down")
+}
+
+func (v *manager) BeatCallback() {
+	v.currentVisualizer.BeatCallback()
 }
 
 type manager struct {
 	audio             chan []float64
+	analyzer          *a.Analyzer
+	streamer          *s.Streamer
 	vIndex            int
 	currentVisualizer m.Visualizer
-	constructors      []VisualizerConstructor
+	constructors      []m.VisualizerConstructor
 }
 
 func (v *manager) Update() (err error) {

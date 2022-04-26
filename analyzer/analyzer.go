@@ -1,36 +1,56 @@
 package analyzer
 
-import "github.com/mjibson/go-dsp/fft"
+import (
+	"github.com/mjibson/go-dsp/fft"
+	"github.com/softtacos/go-visualizer/util"
+)
 
-func NewAnalyzer(ampIn <-chan []float64, ampOut, freqOut chan<- []float64, beatDetectedCallback func()) *analyzer {
-	return &analyzer{
-		ampIn:                ampIn,
-		ampOut:               ampOut,
-		freqOut:              freqOut,
-		beatDetectedCallback: beatDetectedCallback,
+type AnalyzerFunc func(amplitudes []float64)
+
+func NewAnalyzer(ampIn <-chan []float64, funcs ...AnalyzerFunc) *Analyzer {
+	return &Analyzer{
+		ampIn: ampIn,
+		funcs: funcs,
 	}
 }
 
-type analyzer struct {
+type Analyzer struct {
 	ampIn <-chan []float64
-	//outputs []chan []float64
-	ampOut               chan<- []float64
-	freqOut              chan<- []float64
-	beatDetectedCallback func()
+	funcs []AnalyzerFunc
 }
 
-func (a *analyzer) Start() {
-	for {
-		// TODO: figure out a way to make this pass-through to the visualizer
-		amplitudes := <-a.ampIn
+func (a *Analyzer) Start() {
+	go func() {
+		for {
+			amplitudes := <-a.ampIn
+			for _, fun := range a.funcs {
+				fun(amplitudes)
+			}
+		}
+	}()
+}
 
+func (a *Analyzer) Analyze(amplitudes []float64) {
+	for _, fun := range a.funcs {
+		fun(amplitudes)
+	}
+}
+
+func GenerateFftAnalyzerAnalyzer(out chan []float64) AnalyzerFunc {
+	return func(amplitudes []float64) {
+		// TODO: overflow
 		cf := fft.FFTReal(amplitudes)
+		cf = cf[0 : len(cf)/2]
 		frequencies := make([]float64, len(cf))
 		for i := range cf {
 			frequencies[i] = real(cf[i])
 		}
+		out <- frequencies
+	}
+}
 
-		a.ampOut <- amplitudes
-		a.freqOut <- frequencies
+func GenerateBeatDetectorAnalyzer(b *util.BeatDetector) AnalyzerFunc {
+	return func(amplitudes []float64) {
+		b.Push(amplitudes...)
 	}
 }
