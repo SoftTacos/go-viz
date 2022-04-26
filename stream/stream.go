@@ -24,6 +24,10 @@ type Streamer struct {
 	output          chan []float64
 }
 
+func (s *Streamer) GetWindowSize() int{
+	return s.windowSize
+}
+
 func (s *Streamer) setup() {
 	devices, err := pa.Devices()
 	if err != nil {
