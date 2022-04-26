@@ -1,56 +1,82 @@
 package util
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
-func NewFrequencyBuffer(len int)*FrequenciesBuffer {
-	return &FrequenciesBuffer{
-		len:len,
-		mutex: &sync.Mutex{},
-		stuff:make([][]float64,len),
+func NewFrequencyBuffer(len, samples int) *Buffer {
+	frequencies:= make([][]float64, len)
+	for i:=range frequencies{
+		frequencies[i] = make([]float64, samples)
+	}
+	return &Buffer{
+		len:         len,
+		samples:     samples,
+		mutex:       &sync.Mutex{},
+		frequencies: frequencies,
+		//frequencies: make([][]float64, len),
+		//derivative: make([]float64,len),
+		lastSample: time.Now(),
 	}
 }
 
-type FrequenciesBuffer struct {
-	front int
-	len int
-	stuff [][]float64
-	mutex *sync.Mutex
+type Buffer struct {
+	front        int
+	len, samples int
+	frequencies  [][]float64 // [i] is the timeslice, [j] is the frequency band
+	lastSample   time.Time
+	derivative   []float64
+	mutex        *sync.Mutex
 }
 
-func (q *FrequenciesBuffer)Push(args ...[]float64){
-	//for i:=range args{
-	//	q.stuff[(q.front+i)%q.len] = args[i]
-	//}
-	//q.front = (q.front+len(args))%q.len
+func (q *Buffer) Push(args ...[]float64) {
 	q.mutex.Lock()
-	for i :=range args{
-		q.stuff[(q.front+i)%q.len] = args[i]
+	for i := range args {
+		q.frequencies[(q.front+i)%q.len] = args[i]
 	}
-	q.front = (q.front+len(args))%q.len
+	q.front = (q.front + len(args)) % q.len
+
+	f := q.front - 1
+	if f < 0 {
+		f = q.len - 1
+	}
+	now := time.Now()
+	q.derivative = make([]float64, len(args[0]))
+	for i := range q.frequencies[0] {
+		q.derivative[i] = (q.frequencies[q.front][i] - q.frequencies[f][i]) / float64(q.lastSample.Sub(now))
+	}
+	q.lastSample = now
 	q.mutex.Unlock()
 }
 
-func (q *FrequenciesBuffer)Get()[][]float64{
+func (q *Buffer) Get() [][]float64 {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
-	return q.stuff
+	return q.frequencies
 }
 
-func (q *FrequenciesBuffer)GetAverage()(avg []float64){
+func (q *Buffer) GetDerivative() []float64 {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
-	l:=float64(len(q.stuff))
-	avg = make([]float64,len(q.stuff[0]))
-	//for i:=range q.stuff{
-	//	for j:=range q.stuff[i]{
-	//		avg[j]+=q.stuff[i][j]
+	return q.derivative
+}
+
+func (q *Buffer) GetAverage() (avg []float64) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+	l := float64(len(q.frequencies))
+	avg = make([]float64, len(q.frequencies[0]))
+	//for i:=range q.frequencies{
+	//	for j:=range q.frequencies[i]{
+	//		avg[j]+=q.frequencies[i][j]
 	//	}
 	//}
-	for j:=range q.stuff[0]{
-		for i:=range q.stuff{
-			avg[j]+=q.stuff[i][j]
+	for j := range q.frequencies[0] {
+		for i := range q.frequencies {
+			avg[j] += q.frequencies[i][j]
 		}
-		avg[j]/=l
+		avg[j] /= l
 	}
 	return
 }

@@ -11,9 +11,9 @@ import (
 	//"github.com/goccmack/godsp/peaks"
 )
 
-func NewPaddedVisualizer(bufferSize int,ampInput chan []float64)m.Visualizer{
+func NewPaddedVisualizer(bufferSize,samples int,ampInput chan []float64)m.Visualizer{
 	v:=&paddedVisualizer{
-		buffer: util.NewFrequencyBuffer(bufferSize),
+		buffer: util.NewFrequencyBuffer(bufferSize,samples),
 		ampInput:ampInput,
 		ampMutex: &sync.Mutex{},
 	}
@@ -22,7 +22,7 @@ func NewPaddedVisualizer(bufferSize int,ampInput chan []float64)m.Visualizer{
 }
 
 func NewLazyPaddedVisualizer(ampInput chan []float64)m.Visualizer{
-	return NewPaddedVisualizer(7,ampInput)
+	return NewPaddedVisualizer(2,128,ampInput)
 }
 
 func (v *paddedVisualizer)listen(){
@@ -35,6 +35,7 @@ func (v *paddedVisualizer)listen(){
 		v.ampMutex.Unlock()
 
 		cf:=fft.FFTReal(amplitudes)
+		//cf = cf[0:len(cf)/2]
 		frequencies := make([]float64,len(cf))
 		for i:=range cf {
 			frequencies[i] = math.Abs(real(cf[i]))
@@ -48,7 +49,7 @@ type paddedVisualizer struct {
 	ampInput chan []float64
 	currentAmp []float64
 	ampMutex *sync.Mutex
-	buffer *util.FrequenciesBuffer
+	buffer *util.Buffer
 }
 
 func (v *paddedVisualizer)Draw(screen *eb.Image){

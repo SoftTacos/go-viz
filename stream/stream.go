@@ -5,6 +5,7 @@ import (
 	pa "github.com/gordonklaus/portaudio"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -47,10 +48,6 @@ func (s *streamer) Start() {
 				return
 			default:
 			}
-			var out =make([]float32,numSamples)
-			for i:=range in{
-				out[i] = float32(in[i])
-			}
 
 			if len(s.output) == s.cap {
 				<-s.output
@@ -73,16 +70,16 @@ func (s *streamer)Setup() {
 	}
 	for _,d:=range devices{
 		//USB Audio Device
-		//if strings.Contains(d.Name,"USB") && d.MaxInputChannels > 0 {
-		//	device = d
-		//  break
-		//}
-		if d.MaxInputChannels > 0 {
+		if strings.Contains(d.Name,"USB") && d.MaxInputChannels > 0 {
 			device = d
-			break
+		 break
 		}
+		//if d.MaxInputChannels > 0 {
+		//	device = d
+		//	break
+		//}
 	}
-	fmt.Println("device:",device)
+	fmt.Printf("device:%+v\n",device)
 	if device == nil{
 		log.Panic("no USB device found!")
 	}

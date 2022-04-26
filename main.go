@@ -39,15 +39,15 @@ func main() {
 	//ebiten.SetWindowSize(1791,1120)
 	if err = ebiten.RunGame(m.NewVisManager(streamOutput,[]m.VisualizerConstructor{
 		//v.NewBasicVisualizer,
-		//v.NewLazyPaddedVisualizer,
-		v.NewLazyCircleVisualizer,
+		v.NewLazyPaddedVisualizer,
+		//v.NewLazyCircleVisualizer,
 	}));err!=nil{
 		log.Fatal("error running game ",err)
 	}
+	streamer.Stop()
 	if err= pa.Terminate();err!=nil{
 		log.Println("failed to terminate:",err)
 	}
 	log.Println("shutting down")
-	streamer.Stop()
 }
 

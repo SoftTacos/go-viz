@@ -10,13 +10,13 @@ import (
 	//"github.com/goccmack/godsp/peaks"
 )
 
-func NewCircleVisualizer(bufferSize int, ampInput chan []float64) m.Visualizer {
+func NewCircleVisualizer(bufferSize,samples int, ampInput chan []float64) m.Visualizer {
 	var hi, low float64 = 0xff, 0x40 //,0x90
 	v := &circleVisualizer{
-		buffer:   util.NewFrequencyBuffer(bufferSize),
+		buffer:   util.NewFrequencyBuffer(bufferSize,samples),
 		ampInput: ampInput,
 		//poly:     CreatePolyImgHollow(1000,6),
-		poly: NewPolygon(6, 500),
+		poly: NewPolygon(4, 500),
 		colorFloats: [][]float64{
 			{low, hi, low, 1},
 			{low, 0x90, hi, 1},
@@ -56,7 +56,7 @@ func NewCircleVisualizer(bufferSize int, ampInput chan []float64) m.Visualizer {
 }
 
 func NewLazyCircleVisualizer(ampInput chan []float64) m.Visualizer {
-	return NewCircleVisualizer(10, ampInput)
+	return NewCircleVisualizer(10, 128, ampInput)
 }
 
 func (v *circleVisualizer) listen() {
@@ -76,7 +76,7 @@ func (v *circleVisualizer) listen() {
 
 type circleVisualizer struct {
 	ampInput chan []float64
-	buffer   *util.FrequenciesBuffer
+	buffer   *util.Buffer
 	//poly        *eb.Image
 	poly        *Polygon
 	colorFloats [][]float64
@@ -87,13 +87,12 @@ type circleVisualizer struct {
 
 func (v *circleVisualizer) Draw(screen *eb.Image) {
 	var (
-		frequencies   = v.buffer.GetAverage()
+		//frequencies   = v.buffer.GetAverage()
 		w, h          = screen.Size()
 		width, height = float64(w), float64(h)
-		groups        = util.GroupFrequencies(3, frequencies)
-		_             = groups
+		//groups        = util.GroupFrequencies(10, frequencies)
+		dGroups = util.GroupFrequencies(10,v.buffer.GetDerivative())
 	)
-
 	screen.Fill(color.RGBA{
 		R: 0x00,
 		G: 0x00,
@@ -101,16 +100,20 @@ func (v *circleVisualizer) Draw(screen *eb.Image) {
 		A: 0xff,
 	})
 	ops := eb.DrawImageOptions{}
-	ops.ColorM.Scale(0, 0, 0, 1)
+	var change float64 = dGroups[0]
+	if change < 0 {
+		change = 0
+	}
+	ops.ColorM.Scale(0, 0, 0, change*1000000.0)
 	ops.ColorM.Translate(v.colorFloats[0][0]/0xff, v.colorFloats[0][1]/0xff, v.colorFloats[0][2]/0xff, 0)
 	ops.GeoM.Translate(width/2, height/2)
 	//ops = CenterOps(v.poly.GetImg(), ops)
 	//screen.DrawImage(v.poly.GetImg(), &ops)
 	ops.Filter = eb.FilterLinear
-	//v.r+=.025
+	v.r+=.015
 
-	SpiralNestPolygons(screen, v.poly, 8, 1, v.r, ops)
-
+	SpiralNestPolygons(screen, v.poly, 20, 1.75, v.r, ops)
+	SpiralNestPolygons(screen, v.poly, 20, 1.75, v.r+math.Pi, ops)
 }
 
 func DrawImgFromCenter(screen, img *eb.Image, scale float64, ops eb.DrawImageOptions) {
@@ -186,7 +189,7 @@ func NewPolygon(n int, radius float64) *Polygon {
 	p := &Polygon{
 		n:      float64(n),
 		radius: radius,
-		img:    CreatePolyImgHollow(radius, n, .9),
+		img:    CreatePolyImgHollow(radius, n, .96),
 	}
 	p.calculateTheta()
 	p.calculateL()
