@@ -7,59 +7,49 @@ import (
 	"github.com/softtacos/go-visualizer/util"
 	"image/color"
 	"math"
+	"sync"
 	//"github.com/goccmack/godsp/peaks"
 )
 
-func NewCircleVisualizer(bufferSize,samples int, ampInput chan []float64) m.Visualizer {
-	var hi, low float64 = 0xff, 0x40 //,0x90
-	v := &circleVisualizer{
-		buffer:   util.NewFrequencyBuffer(bufferSize,samples),
+func NewPolyVisualizer(bufferSize, samples int, ampInput chan []float64) m.Visualizer {
+	var hi, med, low float64 = 0xff, 0x90, 0x50
+	v := &polyVisualizer{
+		buffer:   util.NewFrequencyBuffer(bufferSize, samples),
 		ampInput: ampInput,
 		//poly:     CreatePolyImgHollow(1000,6),
-		poly: NewPolygon(4, 500),
+		poly: NewPolygon(6, 500),
 		colorFloats: [][]float64{
-			{low, hi, low, 1},
-			{low, 0x90, hi, 1},
+			{low, hi, low, 1},  // green
+			{low, med, hi, 1}, // blue
+			{hi, low, low, 1}, // red
+			{med, low, hi, 1},  // purple
 		},
-		colors: []color.Color{
-			color.RGBA{
-				R: 255,
-				A: 255,
-			},
-			color.RGBA{
-				G: 255,
-				A: 255,
-			},
-			color.RGBA{
-				B: 255,
-				A: 255,
-			},
-			color.RGBA{
-				R: 255,
-				G: 255,
-				A: 255,
-			},
-			color.RGBA{
-				R: 255,
-				B: 255,
-				A: 255,
-			},
-			color.RGBA{
-				B: 255,
-				G: 255,
-				A: 255,
-			},
-		},
+		indexMutex: &sync.Mutex{},
 	}
+	v.testBeatDetector = util.NewBeatDetector(48000, 200, v.beatCallback)
 	go v.listen()
 	return v
 }
 
-func NewLazyCircleVisualizer(ampInput chan []float64) m.Visualizer {
-	return NewCircleVisualizer(10, 128, ampInput)
+func NewLazyPolyVisualizer(ampInput chan []float64) m.Visualizer {
+	return NewPolyVisualizer(4, 256, ampInput)
 }
 
-func (v *circleVisualizer) listen() {
+type polyVisualizer struct {
+	ampInput chan []float64
+	buffer   *util.Buffer
+	//poly        *eb.Image
+	poly        *Polygon
+	colorFloats [][]float64
+	colors      []color.Color
+
+	r                float64
+	indexMutex       *sync.Mutex
+	colorIndex       int
+	testBeatDetector *util.BeatDetector
+}
+
+func (v *polyVisualizer) listen() {
 	for {
 		amplitudes := <-v.ampInput
 
@@ -70,29 +60,34 @@ func (v *circleVisualizer) listen() {
 			frequencies[i] = math.Abs(real(cf[i]))
 		}
 		v.buffer.Push(frequencies)
-		//peaks.Get()
+		v.testBeatDetector.Push(frequencies...)
+
 	}
 }
 
-type circleVisualizer struct {
-	ampInput chan []float64
-	buffer   *util.Buffer
-	//poly        *eb.Image
-	poly        *Polygon
-	colorFloats [][]float64
-	colors      []color.Color
-
-	r float64
+func (v *polyVisualizer) beatCallback() {
+	v.indexMutex.Lock()
+	defer v.indexMutex.Unlock()
+	v.colorIndex = (v.colorIndex + 1) % len(v.colorFloats)
 }
 
-func (v *circleVisualizer) Draw(screen *eb.Image) {
+func lazyClamp(val float64, max float64) float64 {
+	if val > max {
+		return max
+	}
+	return val
+}
+
+func (v *polyVisualizer) Draw(screen *eb.Image) {
 	var (
-		//frequencies   = v.buffer.GetAverage()
+		frequencies   = v.buffer.GetAverage()
 		w, h          = screen.Size()
 		width, height = float64(w), float64(h)
-		//groups        = util.GroupFrequencies(10, frequencies)
-		dGroups = util.GroupFrequencies(10,v.buffer.GetDerivative())
+		groups        = util.GroupFrequencies(5, frequencies)
+		//dGroups = util.GroupFrequencies(5, v.buffer.GetDerivative())
 	)
+	//test:=uint8(lazyClamp(dGroups[3]*1000000.0,255))
+	//fmt.Println(dGroups[3],test)
 	screen.Fill(color.RGBA{
 		R: 0x00,
 		G: 0x00,
@@ -100,20 +95,24 @@ func (v *circleVisualizer) Draw(screen *eb.Image) {
 		A: 0xff,
 	})
 	ops := eb.DrawImageOptions{}
-	var change float64 = dGroups[0]
+	var change float64 = groups[4]
 	if change < 0 {
 		change = 0
 	}
-	ops.ColorM.Scale(0, 0, 0, change*1000000.0)
-	ops.ColorM.Translate(v.colorFloats[0][0]/0xff, v.colorFloats[0][1]/0xff, v.colorFloats[0][2]/0xff, 0)
+	ops.ColorM.Scale(0, 0, 0, .9)//.1+change)
+	v.indexMutex.Lock()
+	ops.ColorM.Translate(v.colorFloats[v.colorIndex][0]/0xff, v.colorFloats[v.colorIndex][1]/0xff, v.colorFloats[v.colorIndex][2]/0xff, 0)
+	v.indexMutex.Unlock()
 	ops.GeoM.Translate(width/2, height/2)
 	//ops = CenterOps(v.poly.GetImg(), ops)
 	//screen.DrawImage(v.poly.GetImg(), &ops)
 	ops.Filter = eb.FilterLinear
-	v.r+=.015
+	v.r += .015
 
-	SpiralNestPolygons(screen, v.poly, 20, 1.75, v.r, ops)
-	SpiralNestPolygons(screen, v.poly, 20, 1.75, v.r+math.Pi, ops)
+	scale := 2.0
+	//scale+= change*10000.0
+	SpiralNestPolygons(screen, v.poly, 22, scale, v.r, ops)
+	SpiralNestPolygons(screen, v.poly, 22, scale, v.r+math.Pi, ops)
 }
 
 func DrawImgFromCenter(screen, img *eb.Image, scale float64, ops eb.DrawImageOptions) {
@@ -146,7 +145,7 @@ func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, rotat
 	}
 	local.GeoM.Translate(-float64(cirleW)/2, -float64(circleH)/2)
 	local.GeoM.Rotate(rotation)
-	local.GeoM.Scale(scale,scale)
+	local.GeoM.Scale(scale, scale)
 
 	local.GeoM.Concat(ops.GeoM)
 	screen.DrawImage(poly.GetImg(), &local)
@@ -165,7 +164,7 @@ func CalcPolyRotationScale(poly *Polygon) (rotation, scale float64) {
 }
 
 func RotatePolyOps(poly *Polygon, ops eb.DrawImageOptions) eb.DrawImageOptions {
-	newL,rotateBy:=CalcPolyRotationScale(poly)
+	newL, rotateBy := CalcPolyRotationScale(poly)
 	imgX, imgY := poly.img.Size()
 
 	deltaX := newL*math.Sin(rotateBy) - float64(imgX)/2

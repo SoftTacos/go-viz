@@ -35,7 +35,7 @@ func (v *paddedVisualizer)listen(){
 		v.ampMutex.Unlock()
 
 		cf:=fft.FFTReal(amplitudes)
-		//cf = cf[0:len(cf)/2]
+		cf = cf[0:len(cf)/2]
 		frequencies := make([]float64,len(cf))
 		for i:=range cf {
 			frequencies[i] = math.Abs(real(cf[i]))

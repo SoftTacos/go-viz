@@ -1,6 +1,7 @@
 package visualizers
 
 import (
+	"fmt"
 	eb "github.com/hajimehoshi/ebiten/v2"
 	"github.com/mjibson/go-dsp/fft"
 	m "github.com/softtacos/go-visualizer/model"
@@ -9,12 +10,6 @@ import (
 )
 
 const thiccness float32 = 10
-
-const maxMagnitude float64 = 1000000000000 // x10^9
-
-func normalizeFrequency(freq, screensize float64) float64 {
-	return freq / maxMagnitude * screensize
-}
 
 var (
 	emptyDrawTriangleOptions = &eb.DrawTrianglesOptions{}
@@ -32,15 +27,21 @@ type basicVisualizer struct {
 	current      []float64
 	currentMutex *sync.Mutex
 }
+var max float64
 
 func (v *basicVisualizer) Draw(screen *eb.Image) {
 	// get cf
 	input := <-v.input
-	l := len(input)
 	cf := fft.FFTReal(input)
+	cf = cf[0:len(cf)/2]
+	l := len(cf)
 	frequencies := make([]float64, l)
 	for i := range cf {
 		frequencies[i] = float64(real(cf[i]))
+		if frequencies[i] > max{
+			fmt.Println("MAX:",max)
+			max = frequencies[i]
+		}
 	}
 
 	//DrawFrequencies(screen,<-v.input)
@@ -50,8 +51,9 @@ func (v *basicVisualizer) Draw(screen *eb.Image) {
 func DrawFrequencies(screen *eb.Image, frequencies []float64) {
 	width, height := screen.Size()
 	//frequencies := <-v.input
-	frequencies = frequencies[0 : len(frequencies)/3]
+	//frequencies = frequencies[0 : len(frequencies)/3]
 	l := len(frequencies)
+	//fmt.Println(l)
 
 	var (
 		vertices  = make([]eb.Vertex, 0, (l+1)*2)

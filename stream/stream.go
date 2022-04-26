@@ -6,11 +6,11 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 )
 
-func NewStreamer(output chan []float64,cap int,stop chan os.Signal)*streamer{
+func NewStreamer(windowSize int, output chan []float64,cap int,stop chan os.Signal)*streamer{
 	return &streamer{
+		windowSize:windowSize,
 		cap:cap,
 		output:output,
 		stop:stop,
@@ -18,16 +18,16 @@ func NewStreamer(output chan []float64,cap int,stop chan os.Signal)*streamer{
 }
 
 type streamer struct {
-	cap int
+	cap,windowSize int
 	stream *pa.Stream
 	output chan []float64
 	stop chan os.Signal
 }
 
 func (s *streamer) Start() {
-	const numSamples = 128
+
 	go func() {
-		in := make([]int32, numSamples)
+		in := make([]int32, s.windowSize)
 		stream,err:=pa.OpenDefaultStream(1,0,48000,len(in),in) // 44100
 		if err!=nil{
 			log.Panic("failed to open stream:",err)
@@ -38,7 +38,7 @@ func (s *streamer) Start() {
 			log.Panic("failed to start stream:",err)
 		}
 		for {
-			time.Sleep(time.Microsecond*500)
+			//time.Sleep(time.Microsecond*500)
 			if err = stream.Read(); err != nil {
 				log.Panic("failed to read from stream ", err)
 			}
@@ -89,7 +89,7 @@ func (s *streamer)Setup() {
 			Channels: 1,
 		},
 		SampleRate: device.DefaultSampleRate,
-		FramesPerBuffer: 128,
+		FramesPerBuffer: s.windowSize,
 	},s.readCallback)
 	if err!=nil{
 		log.Panic("failed to open stream:",err)
@@ -102,7 +102,6 @@ func (s *streamer)Start2(){
 		log.Panic("failed to start stream",err)
 	}
 }
-
 func (s *streamer) readCallback(in []float32){
 	//fmt.Println(in)
 	o := make([]float64,len(in))

@@ -13,6 +13,7 @@ import (
 
 const (
 	wWidth,wHeight = 1280,960
+	windowSize = 256 // number of samples per []float64
 )
 
 func main() {
@@ -27,7 +28,7 @@ func main() {
 	var buffer = 2
 	streamOutput :=make(chan []float64,buffer)
 
-	streamer:=s.NewStreamer(streamOutput,buffer,sig)
+	streamer:=s.NewStreamer(windowSize,streamOutput,buffer,sig)
 	streamer.Setup()
 	streamer.Start2()
 
@@ -38,9 +39,9 @@ func main() {
 	//ebiten.SetFullscreen(true)
 	//ebiten.SetWindowSize(1791,1120)
 	if err = ebiten.RunGame(m.NewVisManager(streamOutput,[]m.VisualizerConstructor{
-		//v.NewBasicVisualizer,
-		v.NewLazyPaddedVisualizer,
-		//v.NewLazyCircleVisualizer,
+		v.NewLazyPolyVisualizer,
+		//v.NewLazyPaddedVisualizer,
+		v.NewBasicVisualizer,
 	}));err!=nil{
 		log.Fatal("error running game ",err)
 	}

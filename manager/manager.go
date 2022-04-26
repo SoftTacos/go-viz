@@ -7,24 +7,23 @@ import (
 	"math/cmplx"
 )
 
+type VisualizerConstructor func(chan []float64) m.Visualizer
 
-type VisualizerConstructor func(chan []float64)m.Visualizer
-
-func NewVisManager(audio chan []float64,constructors []VisualizerConstructor)*manager {
+func NewVisManager(audio chan []float64, constructors []VisualizerConstructor) *manager {
 	return &manager{
-		constructors:constructors,
+		constructors:      constructors,
 		currentVisualizer: constructors[0](audio),
 	}
 }
 
 type manager struct {
-	audio chan []float64
-	vIndex int
+	audio             chan []float64
+	vIndex            int
 	currentVisualizer m.Visualizer
-	constructors []VisualizerConstructor
+	constructors      []VisualizerConstructor
 }
 
-func (v *manager)Update() (err error){
+func (v *manager) Update() (err error) {
 	// TODO: listen for input event to change visualizer
 
 	//l := len(v.input)
@@ -36,14 +35,13 @@ func (v *manager)Update() (err error){
 	return
 }
 
-func (v *manager)Draw(screen *eb.Image) {
+func (v *manager) Draw(screen *eb.Image) {
 	v.currentVisualizer.Draw(screen)
 }
 
-func (v *manager)Layout(outsideWidth,outsideHeight int) (int,int){
-	return outsideWidth,outsideHeight
+func (v *manager) Layout(outsideWidth, outsideHeight int) (int, int) {
+	return outsideWidth, outsideHeight
 }
-
 
 func DFFT64(x []float64, y []complex128, n, s int) {
 	if n == 1 {
