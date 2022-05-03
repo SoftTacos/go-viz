@@ -1,15 +1,16 @@
 package util
 
-import "sync"
-
+import (
+	"sync"
+)
 
 // TODO: can make this generic, nervous about the performance hit though
-func NewCircularPeakSlice(len int)*CircularPeakSlice {
-	values := make([]peak,len)
+func NewCircularPeakSlice(len int) *CircularPeakSlice {
+	values := make([]peak, len)
 	return &CircularPeakSlice{
-		len: len,
+		len:    len,
 		Values: values,
-		mutex: &sync.Mutex{},
+		mutex:  &sync.Mutex{},
 	}
 }
 
@@ -17,6 +18,8 @@ type CircularPeakSlice struct {
 	len, front int
 	Values     []peak
 	mutex      *sync.Mutex
+	mean       float64
+	stdDev     float64
 }
 
 func (c *CircularPeakSlice) GetFront() int {
@@ -32,6 +35,14 @@ func (c *CircularPeakSlice) Push(args ...peak) {
 	c.front = (c.front + len(args)) % c.len
 }
 
-func (c *CircularPeakSlice) Get(start,end int)[]peak{
+func (c *CircularPeakSlice)GetStdDev()float64{
+	return c.stdDev
+}
+
+func (c *CircularPeakSlice)GetMean()float64{
+	return c.mean
+}
+
+func (c *CircularPeakSlice) Get(start, end int) []peak {
 	return nil // TODO
 }

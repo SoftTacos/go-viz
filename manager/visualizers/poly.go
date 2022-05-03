@@ -59,8 +59,6 @@ func newPolyVisualizer(windowSize int, frequencyInput chan []float64) *polyVisua
 		},
 		indexMutex: &sync.Mutex{},
 	}
-	//v.testBeatDetector = util.NewBeatDetector(48000, 200, v.beatCallback)
-	//go v.listen()
 	return v
 }
 
@@ -85,6 +83,7 @@ func newPolyVisualizer(windowSize int, frequencyInput chan []float64) *polyVisua
 
 type polyVisualizer struct {
 	frequencyInput chan []float64
+	// TODO: this should be on the thing analyzing the data? Then how does the viz retrieve the data?
 	buffer         *util.Buffer
 	poly           *Polygon
 	colorFloats    [][]float64
@@ -164,7 +163,6 @@ func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, scale
 	local.GeoM.Translate(-float64(cirleW)/2, -float64(circleH)/2)
 	local.GeoM.Rotate(rotation)
 	local.GeoM.Scale(scale, scale)
-
 	local.GeoM.Concat(ops.GeoM)
 	screen.DrawImage(poly.GetImg(), &local)
 	rotation += rotationStep

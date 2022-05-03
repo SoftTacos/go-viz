@@ -9,8 +9,6 @@ import (
 	s "github.com/softtacos/go-visualizer/stream"
 	"github.com/softtacos/go-visualizer/util"
 	"log"
-	"math"
-	"math/cmplx"
 	"os"
 	"os/signal"
 )
@@ -76,23 +74,21 @@ func (v *manager) BeatCallback() {
 }
 
 func (v *manager) Update() (err error) {
-	// TODO: listen for input event to change visualizer
 	if inpututil.IsKeyJustPressed(eb.KeyLeft) {
 		v.ChangeVisualizers(-1)
 	} else if inpututil.IsKeyJustPressed(eb.KeyRight) {
 		v.ChangeVisualizers(1)
 	}
-	//l := len(v.input)
-	//frequencies :=make([]complex128,l)
-	//DFFT64(<-v.input,frequencies,l,1)
-	//v.currentMutex.Lock()
-	//v.current = make([]float64,l)
-	//v.currentMutex.Unlock()
 	return
 }
 
+// TODO; fix this
 func (v *manager) ChangeVisualizers(dir int) {
-	newViz := v.constructors[(v.vIndex+dir)%len(v.constructors)](v.streamer.GetWindowSize(), v.streamerOutput)
+	index := (v.vIndex+dir)%len(v.constructors)
+	if index < 0{
+		index = len(v.constructors)+index
+	}
+	newViz := v.constructors[index](v.streamer.GetWindowSize(), v.streamerOutput)
 	v.currentVisualizer = newViz
 }
 
@@ -102,17 +98,4 @@ func (v *manager) Draw(screen *eb.Image) {
 
 func (v *manager) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return outsideWidth, outsideHeight
-}
-
-func DFFT64(x []float64, y []complex128, n, s int) {
-	if n == 1 {
-		y[0] = complex(x[0], 0)
-		return
-	}
-	DFFT64(x, y, n/2, 2*s)
-	DFFT64(x[s:], y[n/2:], n/2, 2*s)
-	for k := 0; k < n/2; k++ {
-		tf := cmplx.Rect(1, -2*math.Pi*float64(k)/float64(n)) * y[k+n/2]
-		y[k], y[k+n/2] = y[k]+tf, y[k]-tf
-	}
 }

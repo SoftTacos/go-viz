@@ -51,6 +51,6 @@ func GenerateFftAnalyzerAnalyzer(out chan []float64) AnalyzerFunc {
 
 func GenerateBeatDetectorAnalyzer(b *util.BeatDetector) AnalyzerFunc {
 	return func(amplitudes []float64) {
-		b.Push(amplitudes...)
+		b.Push(amplitudes)
 	}
 }

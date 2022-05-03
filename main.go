@@ -24,6 +24,7 @@ func main() {
 	// will eventually decide which visualizer should be set for the current vis
 	// uses closures to store setup data for the visualizers so they can be created and destroyed easily at runtime
 	karen := man.NewVisManager([]m.VisualizerConstructor{
+		//v.NewForkingVisualizerConstructor,
 		v.NewPolyVisualizerConstructor,
 		//v.NewLazyPaddedVisualizer,
 	})
