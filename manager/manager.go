@@ -14,31 +14,31 @@ import (
 )
 
 const (
-	windowSize    = 256 // number of samples per []float64
-	defaultBuffer = 2
+	windowSize    = 512 // number of samples per []float64
+	defaultBuffer = 5
 )
 
 // TODO: this is hideous, clean it up
 func NewVisManager(constructors []m.VisualizerConstructor) *manager {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
-	streamOutput := make(chan []float64, defaultBuffer)
+	analyzerInput := make(chan []float64, defaultBuffer)
+	beatInput := make(chan []float64, defaultBuffer)
 	frequencyOutput := make(chan []float64, defaultBuffer)
-
-	streamer := s.NewStreamer(windowSize, streamOutput, defaultBuffer)
+	streamer := s.NewStreamer(windowSize, []chan []float64{analyzerInput,beatInput}, defaultBuffer)
 	viz := constructors[0](windowSize, frequencyOutput)
 	var beatDetector *util.BeatDetector
-	beatDetector = util.NewBeatDetector(48000, 190, nil)
-	var analyzer *a.Analyzer = a.NewAnalyzer(streamOutput,
-		a.GenerateFftAnalyzerAnalyzer(frequencyOutput),
-		a.GenerateBeatDetectorAnalyzer(beatDetector))
-
+	beatDetector = util.NewBeatDetector(windowSize,48000, 210, nil)
+	go beatDetector.Listen(beatInput)
+	//var beatDetector *util.FrequencyBeatDetector
+	//beatDetector = util.NewFrequencyBeatDetector(windowSize,48000, 200, nil)
+	var analyzer *a.Analyzer = a.NewAnalyzer(analyzerInput,frequencyOutput,beatDetector)
 	m := &manager{
 		analyzer:          analyzer,
 		constructors:      constructors,
 		currentVisualizer: viz,
 		streamer:          streamer,
-		streamerOutput:    streamOutput,
+		streamerOutput:    analyzerInput,
 	}
 
 	beatDetector.SetCallback(m.BeatCallback)
@@ -82,7 +82,7 @@ func (v *manager) Update() (err error) {
 	return
 }
 
-// TODO; fix this
+// TODO: doesn't clear old visualizer from memory
 func (v *manager) ChangeVisualizers(dir int) {
 	index := (v.vIndex+dir)%len(v.constructors)
 	if index < 0{
@@ -90,6 +90,7 @@ func (v *manager) ChangeVisualizers(dir int) {
 	}
 	newViz := v.constructors[index](v.streamer.GetWindowSize(), v.streamerOutput)
 	v.currentVisualizer = newViz
+	v.vIndex = index
 }
 
 func (v *manager) Draw(screen *eb.Image) {

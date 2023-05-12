@@ -4,14 +4,15 @@ import (
 	"fmt"
 	pa "github.com/gordonklaus/portaudio"
 	"log"
+	"math"
 	"strings"
 )
 
-func NewStreamer(windowSize int, output chan []float64, cap int) *Streamer {
+func NewStreamer(windowSize int, outputs []chan []float64, cap int) *Streamer {
 	s := &Streamer{
 		windowSize: windowSize,
 		cap:        cap,
-		output:     output,
+		outputs:     outputs,
 	}
 	s.setup()
 	return s
@@ -21,7 +22,7 @@ type Streamer struct {
 	cap, windowSize int
 	device          *pa.DeviceInfo
 	stream          *pa.Stream
-	output          chan []float64
+	outputs []chan []float64
 }
 
 func (s *Streamer) GetWindowSize() int{
@@ -69,13 +70,30 @@ func (s *Streamer) Start() {
 	}
 	fmt.Println("Streamer started")
 }
+
+//func (s *Streamer) readCallback(in []int32) {
+//	// TODO: add overflow <-s.output if len is full
+//	o := make([]float64, len(in))
+//	for i := range in {
+//		o[i] = math.Abs(float64(in[i]))
+//	}
+//	for _, output := range s.outputs {
+//		output <- o
+//	}
+//}
+
 func (s *Streamer) readCallback(in []float32) {
 	// TODO: add overflow <-s.output if len is full
 	o := make([]float64, len(in))
 	for i := range in {
-		o[i] = float64(in[i])
+		o[i] = math.Abs(float64(in[i]))
 	}
-	s.output <- o
+	for _, output := range s.outputs {
+		if len(output) > s.cap{
+			<-output
+		}
+		output <- o
+	}
 }
 
 //func (s *Streamer) Start_old() {

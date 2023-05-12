@@ -1,7 +1,6 @@
 package visualizers
 
 import (
-	"fmt"
 	eb "github.com/hajimehoshi/ebiten/v2"
 	"github.com/mjibson/go-dsp/fft"
 	m "github.com/softtacos/go-visualizer/model"
@@ -21,15 +20,16 @@ func NewPaddedVisualizer(bufferSize, samples int, ampInput chan []float64) m.Vis
 	return v
 }
 
-func NewLazyPaddedVisualizer(ampInput chan []float64) m.Visualizer {
-	return NewPaddedVisualizer(2, 128, ampInput)
+func NewLazyPaddedVisualizer(windowSize int,ampInput chan []float64) m.Visualizer {
+	return NewPaddedVisualizer(2, windowSize, ampInput)
 }
 
 func (v *paddedVisualizer) listen() {
 	for {
 		// TODO: extract out into a pipeline once we can test this out on a pi
 		amplitudes := <-v.ampInput
-
+		v.buffer.Push(amplitudes)
+		continue
 		v.ampMutex.Lock()
 		v.currentAmp = amplitudes
 		v.ampMutex.Unlock()
@@ -60,7 +60,7 @@ func (v *paddedVisualizer) Draw(screen *eb.Image) {
 }
 
 func (v *paddedVisualizer) BeatCallback() {
-	fmt.Println("TODO: padded viz beat callback")
+	//fmt.Println("TODO: padded viz beat callback")
 }
 
 //func GetPeaks(x []float64, sep int) []int {

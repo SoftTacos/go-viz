@@ -47,6 +47,7 @@ func NewPolyVisualizerConstructor(windowSize int, frequencyInput chan []float64)
 
 func newPolyVisualizer(windowSize int, frequencyInput chan []float64) *polyVisualizer {
 	var hi, med, low float64 = 0xff, 0x90, 0x50
+	_=med
 	v := &polyVisualizer{
 		buffer:         util.NewFrequencyBuffer(defaultBufferSize, windowSize),
 		frequencyInput: frequencyInput,
@@ -54,8 +55,9 @@ func newPolyVisualizer(windowSize int, frequencyInput chan []float64) *polyVisua
 		colorFloats: [][]float64{
 			{low, hi, low, 1}, // green
 			{low, med, hi, 1}, // blue
+			{low, hi, hi, 1}, // cyan
 			{hi, low, low, 1}, // red
-			{med, low, hi, 1}, // purple
+			{hi, low, hi, 1}, // pink
 		},
 		indexMutex: &sync.Mutex{},
 	}
@@ -147,8 +149,9 @@ func (v *polyVisualizer) Draw(screen *eb.Image) {
 	v.r += .015
 	scale := 2.0
 	rotStep, scaleStep := CalcPolyRotationScale(v.poly)
-	SpiralNestPolygons(screen, v.poly, 22, scale, scaleStep, v.r, rotStep, ops)
-	SpiralNestPolygons(screen, v.poly, 22, scale, scaleStep, v.r+math.Pi, rotStep, ops)
+	const depth = 25
+	SpiralNestPolygons(screen, v.poly, depth, scale, scaleStep, v.r, rotStep, ops)
+	SpiralNestPolygons(screen, v.poly, depth, scale, scaleStep, v.r+math.Pi, rotStep, ops)
 }
 
 func SpiralNestPolygons(screen *eb.Image, poly *Polygon, depth int, scale, scaleStep, rotation, rotationStep float64, ops eb.DrawImageOptions) {

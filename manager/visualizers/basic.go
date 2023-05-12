@@ -1,7 +1,6 @@
 package visualizers
 
 import (
-	"fmt"
 	eb "github.com/hajimehoshi/ebiten/v2"
 	"github.com/mjibson/go-dsp/fft"
 	m "github.com/softtacos/go-visualizer/model"
@@ -39,7 +38,7 @@ func (v *basicVisualizer) Draw(screen *eb.Image) {
 	for i := range cf {
 		frequencies[i] = float64(real(cf[i]))
 		if frequencies[i] > max{
-			fmt.Println("MAX:",max)
+			//fmt.Println("MAX:",max)
 			max = frequencies[i]
 		}
 	}
@@ -49,7 +48,7 @@ func (v *basicVisualizer) Draw(screen *eb.Image) {
 }
 
 func (v *basicVisualizer)BeatCallback(){
-	fmt.Println("TODO: padded viz beat callback")
+	//fmt.Println("TODO: padded viz beat callback")
 }
 
 
@@ -84,7 +83,7 @@ func DrawFrequencies(screen *eb.Image, frequencies []float64) {
 		x := (xchunk * float32(i+1))
 		//x2:=xchunk*(i+1)
 
-		fOffset := -float32(f) * 5.0//20000000 //float32(v.height)
+		fOffset := -float32(f) * 10.0//20000000 //float32(v.height)
 		y1 := midheight + fOffset - 2*thiccness
 		y2 := midheight + fOffset //+ thiccness
 

@@ -24,9 +24,11 @@ func main() {
 	// will eventually decide which visualizer should be set for the current vis
 	// uses closures to store setup data for the visualizers so they can be created and destroyed easily at runtime
 	karen := man.NewVisManager([]m.VisualizerConstructor{
+		//v.NewDummyVisualizer,
 		//v.NewForkingVisualizerConstructor,
+		// v.NewBasicVisualizer,
 		v.NewPolyVisualizerConstructor,
-		//v.NewLazyPaddedVisualizer,
+		// v.NewLazyPaddedVisualizer,
 	})
 	karen.Start()
 	ebiten.SetWindowSize(wWidth, wHeight)
